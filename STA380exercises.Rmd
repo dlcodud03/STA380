@@ -1,0 +1,709 @@
+---
+title: "STA380"
+output:
+  html_document: default
+  pdf_document: default
+date: "2024-08-06"
+---
+
+## Probability practice
+
+**PART** A
+
+p(random_clickers)=0.3 p(truthful_clickers)=0.7
+
+p(yes)=0.65 p(no)=0.35
+
+p(yes\|random_clicker)=0.5 #randomness p(no\|random_clicker)=0.5
+
+P(Y\|TC) =?
+
+rule of total probability: P(Y) = P(Y\|TC) P(TC) + P(Y\|RC) P(RC)
+
+**0.65 = P(Y\|TC) (0.7) + 0.5 (0.3) P(Y\|TC)= .714** **The fraction of people who are truthful clickers answered yes is .714.**
+
+**PART B**
+
+sensitivity: p(tests positive\|has disease)= .993
+
+specificity: p(tests negative\|has NO disease)= 0.9999 p(tests postive\| has NO disease)=0.0001 p(has disease)= 0.000025 p(no disease)= 0.999975
+
+p(has disease\|tests positive)=?
+
+p(test positive) = 0.0001248224
+
+```{r}
+(.993)*(0.000025) + (0.0001)*(.999975)
+#0.0001248225
+
+```
+
+Bayes theorem: p(has disease\|tests positive)= p(has disease) p(tests positive\|has disease) / p(tests positive)
+
+```{r}
+(.993)*(0.000025) /(0.0001248225) #=0.198824
+```
+
+**p(has disease\|tests positive)=0.198824 Given someone tests positive, the probability that they have the disease is .1989 or approximately 19.89%**
+
+## Wrangling the Billboard Top 100
+
+**PART A**
+
+```{r}
+library(dplyr)
+billboard=read.csv("/Users/sarahlee/Downloads/billboard.csv")
+
+billboard=billboard%>%
+  select(performer, song, year, week, week_position)
+
+top10songs=billboard%>%
+  group_by(performer, song)%>%
+  summarise(count=n())%>%
+  ungroup()%>%
+  arrange(desc(count))%>%
+  head(10)
+
+top10songs
+
+```
+
+**PART B**
+
+```{r}
+library(ggplot2)
+unique_songs_per_year <- billboard %>%
+  filter(year != 1958 & year != 2021)%>%
+  group_by(year) %>%
+  summarise(unique_songs_count = n_distinct(song)) %>%
+  ggplot(aes(x = year, y = unique_songs_count)) +
+  geom_line(color = "blue") +
+  geom_point() +
+  labs(x = "Year",
+       y = "Number of Unique Songs")
+
+unique_songs_per_year
+```
+
+**PART C**
+
+```{r}
+hits <- billboard %>%
+  group_by(performer, song) %>%
+  summarise(weeks_count = n(), .groups = 'drop') %>%
+  filter(weeks_count >= 10)
+
+atleast30hits <- hits %>%
+  group_by(performer) %>%
+  summarise(hits_count = n(), .groups = 'drop')%>%
+  filter(hits_count >= 30)%>%
+  ggplot(aes(x = reorder(performer, hits_count), y = hits_count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "At Least 30 Ten-Week Hits",
+       x = "Performer",
+       y = "Number of Ten-Week Hits")
+
+atleast30hits
+```
+
+## Visual story telling part 1: green buildings
+
+```{r}
+gb=read.csv("/Users/sarahlee/Downloads/greenbuildings.csv")
+
+gb_filtered=gb%>%
+  filter(leasing_rate >= 10)
+
+#median rent
+gb_filtered %>%
+  group_by(green_rating) %>%
+  summarise(median_rent = median(Rent))
+
+#mean of green vs non-green
+gb_filtered%>%
+  group_by(green_rating)%>%
+  summarise(across(c(size, empl_gr, Rent, leasing_rate, stories, age, renovated, class_a, class_b, net, amenities, cd_total_07, hd_total07, Precipitation, Gas_Costs, Electricity_Costs, cluster_rent), mean))%>%
+  ungroup()   
+
+#median of green vs non-green
+gb_filtered%>%
+  group_by(green_rating)%>%
+  summarise(across(c(size, empl_gr, Rent, leasing_rate, stories, age, renovated, class_a, class_b, net, amenities, cd_total_07, hd_total07, Precipitation, Gas_Costs, Electricity_Costs, cluster_rent), median))%>%
+  ungroup()
+```
+
+According to the mean and medians, we can observe that green buildings have a younger age population, larger size in sqft, better quality buildings (more 'class a') with amenities. This analysis suggests that the difference in rent might not be solely due to the buildings' green rating.
+
+```{r}
+#cluster rent vs rent by green rating
+ggplot(gb_filtered, aes(x = cluster_rent, y = Rent, color = as.factor(green_rating))) +
+  geom_point(alpha = 0.5) 
+ggplot(gb_filtered, aes(x = cluster_rent, y = Rent, color = as.factor(green_rating))) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~ class_a + class_b + amenities)
+
+#by class a 
+ggplot(gb_filtered, aes(x = as.factor(green_rating), y = Rent, fill = as.factor(green_rating))) +
+  geom_boxplot() +
+  facet_wrap(~ class_a) +
+  labs(title = "Rent of Class A",
+       y = "Rent ($ per sqft/yr)",
+       fill = "Green Rating") 
+
+```
+
+Although I agree with guru's median observation, I observed additional points that might interfere with his conclusions. After looking at both mean and median distributions across the various variables, I saw that green buildings have a younger age population, larger size in sqft, better quality buildings (more 'class a') with amenities. Furthermore, to assess if these variables could potentially be confounding, I adjusted the data accounting for these variables. However, rent premium for green buildings did not show a clear premium against non green buildings for class_a, class_b, and amenities. When adjusting for these variables, the rent premium for green buildings does not appear as significant, especially when focusing on Class A buildings. Therefore, the financial advantage of investing in green buildings might not be as clear as initially suggested. The rent premium that green buildings command could be largely attributed to their associated characteristics rather than their green certification alone.
+
+## Visual story telling part 2: Capital Metro data
+
+```{r}
+capmetro=read.csv("/Users/sarahlee/Downloads/capmetro_UT.csv")
+
+capmetro%>%
+  group_by(day_of_week,hour_of_day)%>%
+  summarize(total_boarding=sum(boarding),
+            total_alighting=sum(alighting))%>%
+  ungroup()%>%
+  ggplot(aes(x=hour_of_day))+
+  geom_line(aes(y=total_boarding,color="boarding"))+
+  geom_line(aes(y=total_alighting,color="alighting"))+
+  facet_wrap(~ day_of_week)+
+  labs(y="count")
+
+#The plots represent the total boarding and alighting counts through out each operating hour of each days of the week. Generally, we see that most activities occur during the weekdays. Furthermore, during these weekdays, we see a general trend of higher alighting counts during the earlier hours of the day and higher boarding counts during the later hours of the day. 
+```
+
+```{r}
+capmetro%>%
+  group_by(temperature,hour_of_day)%>%
+  summarize(tot_boarding=sum(boarding),
+            tot_alighting=sum(alighting))%>%
+  ungroup()%>%
+  ggplot(aes(x=temperature))+
+  geom_line(aes(y=tot_boarding,color="boarding"))+
+  geom_line(aes(y=tot_alighting,color="alighting"))+
+  facet_wrap(~ hour_of_day)+
+  labs(y="count")
+
+#The plots represent the total alighting and boarding counts compared to temperature for each operating hours. Generally, during the earlier hours we see higher rates of alighting as more students get to campus for the day after a similar counts for both alighting and boarding during the midday, we see higher rates of boarding as many people use the metro to leave the campus to go back home. Although most of the peaks occured was during the higher temperatures, there wasn't a significant impact or trend of temperature.
+```
+
+## Visual story telling part 2: flights at ABIA
+
+```{r}
+library(tidyr)
+
+abia=read.csv("/Users/sarahlee/Downloads/ABIA.csv")
+
+abia%>%
+  group_by(DayOfWeek)%>%
+  summarize(AvgArrDelay=mean(ArrDelay, na.rm=TRUE),
+            AvgDepDelay=mean(DepDelay, na.rm=TRUE)) %>%
+  ggplot(aes(x=DayOfWeek))+
+  geom_point(aes(y=AvgArrDelay, color="Arrival Delays"),stat = "identity")+
+  geom_point(aes(y=AvgDepDelay, color="Depart Delays"),stat = "identity")+
+  geom_line(aes(y=AvgArrDelay,color="Arrival Delays"))+
+  geom_line(aes(y=AvgDepDelay,color="Depart Delays"))
+  
+abia%>%
+  group_by(UniqueCarrier)%>%
+  summarize(Avg_Arrival_Delay=mean(ArrDelay, na.rm=TRUE),
+            Avg_Departure_Delay=mean(DepDelay, na.rm=TRUE),
+            flightcount=n()) %>%
+  pivot_longer(cols = c(Avg_Arrival_Delay, Avg_Departure_Delay), names_to = "DelayType", values_to = "Average_Delay")%>%
+  ggplot(aes(x = reorder(UniqueCarrier, Average_Delay), y = Average_Delay, fill = DelayType))+
+  geom_bar(stat = "identity", position = "dodge")+
+  labs(title="Average Delays by Carrier",
+       x="Carrier",
+       y="Avg Arrival Delay in minutes",
+       fill="Type of Delay")
+
+```
+
+## Portfolio modeling
+
+```{r}
+library(mosaic)
+library(quantmod)
+library(foreach)
+
+mystocks = c("MRK", "XOM", "SPY")
+getSymbols(mystocks, from="2019-08-12")
+
+MRKa = adjustOHLC(MRK)
+XOMa = adjustOHLC(XOM)
+SPYa = adjustOHLC(SPY)
+
+for(ticker in mystocks) {
+	expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+	eval(parse(text=expr))
+}
+plot(ClCl(MRKa))
+plot(ClCl(XOMa))
+plot(ClCl(SPYa))
+
+all_returns = cbind(ClCl(MRKa),ClCl(XOMa),ClCl(SPYa))
+all_returns = as.matrix(na.omit(all_returns))
+
+pairs(all_returns)
+
+#simulates a random day
+return.today = resample(all_returns, 1, orig.ids=FALSE)
+
+total_wealth = 100000
+my_weights = c(0.33,0.33,0.34)
+holdings = total_wealth*my_weights
+holdings = holdings*(1 + return.today)
+
+initial_wealth = 100000
+sim1 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.33,0.33,0.34)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim1)
+hist(sim1[,n_days], 25,
+     main = "Histogram of Wealth after 20 Days")
+
+# final welath
+mean(sim1[,n_days])
+# profit/loss
+mean(sim1[,n_days] - initial_wealth)
+hist(sim1[,n_days]- initial_wealth, breaks=30)
+#5% VaR
+quantile(sim1[,n_days]- initial_wealth, prob=0.05)
+
+```
+
+```{r}
+#aggressive ETFs
+
+mystocks = c("QQQ", "VUG", "IWF","VGT","XLK")
+getSymbols(mystocks, from="2019-08-12")
+
+QQQa = adjustOHLC(QQQ)
+VUGa = adjustOHLC(VUG)
+IWFa = adjustOHLC(IWF)
+VGTa = adjustOHLC(VGT)
+XLKa = adjustOHLC(XLK)
+
+
+for(ticker in mystocks) {
+	expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+	eval(parse(text=expr))
+}
+plot(ClCl(QQQa))
+plot(ClCl(VUGa))
+plot(ClCl(IWFa))
+plot(ClCl(VGTa))
+plot(ClCl(XLKa))
+
+all_returns = cbind(ClCl(QQQa),ClCl(VUGa),ClCl(IWFa),ClCl(VGTa), ClCl(XLKa))
+all_returns = as.matrix(na.omit(all_returns))
+
+pairs(all_returns)
+
+#simulates a random day
+return.today = resample(all_returns, 1, orig.ids=FALSE)
+
+total_wealth = 100000
+my_weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+holdings = total_wealth*my_weights
+holdings = holdings*(1 + return.today)
+
+initial_wealth = 100000
+sim2 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim2)
+hist(sim2[,n_days], 25,
+     main = "Histogram of Wealth after 20 Days")
+
+# final welath
+mean(sim2[,n_days])
+# profit/loss
+mean(sim2[,n_days] - initial_wealth)
+hist(sim2[,n_days]- initial_wealth, breaks=30)
+#5% VaR
+quantile(sim2[,n_days]- initial_wealth, prob=0.05)
+```
+
+```{r}
+#safe and long run ETF
+
+
+mystocks = c("AIQ", "VOO", "VIG","XLV")
+getSymbols(mystocks, from="2019-08-12")
+
+AIQa = adjustOHLC(AIQ)
+VOOa = adjustOHLC(VOO)
+VIGa = adjustOHLC(VIG)
+SCHAa = adjustOHLC(XLV)
+
+
+for(ticker in mystocks) {
+	expr = paste0(ticker, "a = adjustOHLC(", ticker, ")")
+	eval(parse(text=expr))
+}
+plot(ClCl(AIQa))
+plot(ClCl(VOOa))
+plot(ClCl(VIGa))
+plot(ClCl(XLVa))
+
+all_returns = cbind(ClCl(AIQa),ClCl(VOOa),ClCl(VIGa),ClCl(XLVa))
+all_returns = as.matrix(na.omit(all_returns))
+
+pairs(all_returns)
+
+#simulates a random day
+return.today = resample(all_returns, 1, orig.ids=FALSE)
+
+total_wealth = 100000
+my_weights = c(0.2, 0.2, 0.3, 0.3)
+holdings = total_wealth*my_weights
+holdings = holdings*(1 + return.today)
+
+initial_wealth = 100000
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.2, 0.2, 0.3, 0.3)
+	holdings = weights * total_wealth
+	n_days = 20
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim3)
+hist(sim3[,n_days], 25,
+     main = "Histogram of Wealth after 20 Days")
+
+# final wealth
+mean(sim3[,n_days])
+# profit/loss
+mean(sim3[,n_days] - initial_wealth)
+hist(sim3[,n_days]- initial_wealth, breaks=30)
+#5% VaR
+quantile(sim3[,n_days]- initial_wealth, prob=0.05)
+
+```
+
+## Clustering and dimensionality reduction
+
+```{r}
+library(Rtsne)
+wine=read.csv("/Users/sarahlee/Downloads/wine.csv")
+
+#PCA
+winescaled <- scale(wine[, 1:11],center=TRUE, scale=TRUE)
+wine_pca=prcomp(winescaled,center=TRUE,scale. = TRUE)
+plot(wine_pca)
+summary(wine_pca)
+
+loadings = wine_pca$rotation
+scores = wine_pca$x
+
+qplot(scores[,1], fill=wine$color, xlab='Component 1', ylab='Count')
+
+pca_df <- data.frame(wine_pca$x, wine[, 12:13]) #wine color and quality 
+pca_df$color <- factor(wine$color)
+
+ggplot(pca_df, aes(x=PC1,y=PC2, color=color))+
+  geom_point(alpha=0.5)+
+  labs(title = "PCA- Wine Color")
+
+ggplot(pca_df, aes(x=PC1,y=PC2, color=as.factor(quality)))+
+  geom_point(alpha=0.5)+
+  labs(title = "PCA- Wine Quality")
+```
+
+```{r}
+#KMEANS
+set.seed(1)
+wine_kmeans=kmeans(winescaled,centers=2,nstart=25)
+kmeans_df=data.frame(winescaled, cluster = factor(wine_kmeans$cluster), wine_color = factor(wine$color),wine_quality = factor(wine$quality))
+
+# Apply K-Means clustering with 10 clusters (for different wine qualities)
+wine_kmeans2 = kmeans(winescaled, 10, nstart=50)
+# Plot wine quality, filled by K-Means cluster assignments (10 clusters)
+qplot(quality, fill=factor(wine_kmeans2$cluster), data = wine)
+
+table(wine$color, wine_kmeans$cluster) # Compare K-Means clusters with wine color
+table(wine$quality, wine_kmeans$cluster) # Compare K-Means clusters with wine quality
+
+qplot(quality, fill=factor(wine_kmeans$cluster), data = wine) #Plot wine quality, filled by K-Means cluster
+qplot(color, fill=factor(wine_kmeans$cluster), data = wine) #Plot wine color, filled by K-Means cluster
+
+ggplot(kmeans_df, aes(x = wine_pca$x[,1], y = wine_pca$x[,2], color = wine_color)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "K-means Clustering- Wine Color", x = "PC1", y = "PC2", color = "Wine Color")
+
+ggplot(kmeans_df, aes(x = wine_pca$x[,1], y = wine_pca$x[,2], color = wine_quality)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "K-means Clustering- Wine Quality", x = "PC1", y = "PC2", color = "Wine Quality")
+
+
+#K-Means cluster assignments on the first two principal components
+ggplot(pca_df, aes(x=PC1,y=PC2,color=factor(wine_kmeans$cluster)))+
+  geom_point(alpha=0.5) #best distinguishes the two wine colors (very few overlaps)
+```
+
+```{r}
+#tSNE
+set.seed(1)
+winescaled_unique <- winescaled[!duplicated(winescaled), ]
+tsne_results <- Rtsne(winescaled_unique, dims = 2, perplexity = 30)
+
+wine_unique <- wine[!duplicated(winescaled), ]
+tsne_df <- data.frame(tsne_results$Y, wine_unique[, 12:13])
+colnames(tsne_df) <- c("Dim1", "Dim2","quality")
+tsne_df$color <- factor(wine_unique$color)
+
+#Plot t-SNE results, colored by wine color
+ggplot(tsne_df, aes(x = Dim1, y = Dim2, color = color)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "t-SNE- Wine Color")
+#Plot t-SNE results, colored by wine quality
+ggplot(tsne_df, aes(x = Dim1, y = Dim2, color = quality)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "t-SNE- Wine Quality")
+
+```
+
+After analyzing the results of the following dimension reducing techniques: PCA, K-means clustering, and tSNE, tSNE best distinguishes wine color. From the plot above, we see a distinct separation of wine colors and thus suggests that the chemical property are informative in understanding the relationship of wine color. However, when trying to capture information about wine quality, none of these methods successfully distinguishes higher quality wines from lower quality wines.
+
+## Market segmentation
+
+```{r}
+library(factoextra)
+library(corrplot)
+
+sns=read.csv("/Users/sarahlee/Downloads/social_marketing.csv")
+
+summary(sns)
+
+sns[is.na(sns)]=0
+sns_normalized=as.data.frame(scale(sns[,-1]))
+sns_normalized$X=sns$X
+
+sns_pca=prcomp(sns_normalized[,-ncol(sns_normalized)],center=T,scale. = TRUE)
+sns_pca_df <- data.frame(sns_pca$x)
+sns_pca_df$X <- sns_normalized$X
+
+#visualization
+ggplot(sns_pca_df, aes(x = PC1, y = PC2)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "PCA of Social Marketing Data",
+       x = "Principal Component 1",
+       y = "Principal Component 2") 
+# plots the first two principal components to capture the most variance in data 
+
+fviz_nbclust(sns_normalized[, -ncol(sns_normalized)], kmeans, method = "wss")
+#optimal number of clusters at 3 using the elbow method
+set.seed(1)
+sns_kmeans=kmeans(sns_normalized[,-ncol(sns_normalized)],center=3,nstart=25)
+sns_pca_df$cluster <- factor(sns_kmeans$cluster)
+
+ggplot(sns_pca_df, aes(x=PC1, y=PC2, color=cluster))+
+  geom_point(alpha=0.5)
+# This shows the 3 distinct clusters with the twitter followers as each clusters represent the market segment based on the their interests
+```
+
+The PCA plot shows how the data points are distributed in the first two principal components. The subsequent clustering analysis suggests that the Twitter followers can be divided into 3 distinct segments (or market segments). The clustering reflects the 3 different groups of followers with different sets of interests.
+
+```{r}
+# Calculate the correlation matrix
+cor_matrix <- cor(sns_normalized[,-ncol(sns_normalized)])
+
+# Visualize the correlation matrix
+corrplot(cor_matrix, type = "upper")
+
+sns_normalized$cluster <- sns_kmeans$cluster
+plot_cluster_correlation <- function(cluster_number) {
+  cluster_data <- sns_normalized %>% filter(cluster == cluster_number) %>% select(-X, -cluster)
+  cor_matrix <- cor(cluster_data)
+  corrplot(cor_matrix, method = "circle", type = "upper", title = paste("Correlation Matrix for Cluster", cluster_number), mar=c(0,0,1,0))
+}
+
+# Plot correlation matrices for each cluster
+par(mfrow=c(1,3))  # Adjust layout to fit all plots in one window
+plot_cluster_correlation(1)
+plot_cluster_correlation(2)
+plot_cluster_correlation(3)
+
+
+show_top_correlations <- function(cluster_number, top_n = 5) {
+  cluster_data <- sns_normalized %>% filter(cluster == cluster_number) %>% select(-X, -cluster)
+  cor_matrix <- cor(cluster_data)
+  
+  # Get the upper triangle of the correlation matrix 
+  upper_tri <- cor_matrix
+  upper_tri[lower.tri(upper_tri, diag = TRUE)] <- NA
+  
+  cor_long <- as.data.frame(as.table(upper_tri))
+  
+  # Filter for the top n most correlated pairs
+  top_correlations <- cor_long %>% 
+    filter(!is.na(Freq)) %>% 
+    arrange(desc(abs(Freq))) %>% 
+    head(top_n)
+  
+  print(paste("Top", top_n, "correlated variable pairs in Cluster", cluster_number))
+  print(top_correlations)
+  
+  return(top_correlations)
+}
+
+top_correlations_cluster_1 <- show_top_correlations(1, top_n = 5)
+top_correlations_cluster_2 <- show_top_correlations(2, top_n = 5)
+top_correlations_cluster_3 <- show_top_correlations(3, top_n = 5)
+```
+
+Overall, health_nutrition and personal_fitness with online_gaming and college_uni all represented each of the clusters' interests as it was the highest correlated variables for all three segments/clusters. This suggests that these interests tend to co-occur frequently across the segments, potentially indicating key areas of focus for marketing strategies.
+
+## The Reuters corpus
+
+**Question**: Can we identify distinct clusters of writing styles in Benjamin Kang Lim's articles using PCA and hierarchical clustering?
+
+**Approach**: 1. Pre Processing text data 2. TFIDF 3. PCA (dimension reducing) 4. Clustering
+
+```{r}
+library(tm) 
+library(tidyverse)
+library(slam)
+library(proxy)
+library(RCurl)
+
+readerPlain = function(fname){readPlain(elem=list(content=readLines(fname)), id=fname, language='en') }
+
+file_list = Sys.glob('/Users/sarahlee/Downloads/STA380-master/data/ReutersC50/C50train/BenjaminKangLim/*.txt')
+ben = lapply(file_list, readerPlain) 
+
+mynames = file_list %>%
+	{ strsplit(., '/', fixed=TRUE) } %>%
+	{ lapply(., tail, n=2) } %>%
+	{ lapply(., paste0, collapse = '') } %>%
+	unlist
+
+mynames
+names(ben) = mynames
+documents_raw = Corpus(VectorSource(ben))
+
+#preprocessing text data 
+my_documents = documents_raw
+my_documents = tm_map(my_documents, content_transformer(removePunctuation))
+my_documents = tm_map(my_documents, content_transformer(tolower))
+my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+my_documents = tm_map(my_documents, content_transformer(removeNumbers))
+my_documents = tm_map(my_documents, content_transformer(stripWhitespace)) 
+
+DTM_ben = DocumentTermMatrix(my_documents)
+
+inspect(DTM_ben[1:10, 1:20]) #frequency of terms in the first 10 documents and first 20 terms
+findAssocs(DTM_ben, "ban", .5) #terms highly associated with 'ban' 
+
+# Drop terms that only occur in one or two documents
+DTM_ben = removeSparseTerms(DTM_ben, 0.95)
+tfidf_ben = weightTfIdf(DTM_ben)
+
+# PCA on term frequencies
+X = as.matrix(tfidf_ben) # DTM to matrix
+summary(colSums(X))  
+scrub_cols = which(colSums(X) == 0)
+X = X[,-scrub_cols]
+
+pca_ben = prcomp(X, rank=2, scale=TRUE)
+plot(pca_ben) 
+
+# top 25 loadings for the first two principal components
+pca_ben$rotation[order(abs(pca_ben$rotation[,1]),decreasing=TRUE),1][1:25]
+pca_ben$rotation[order(abs(pca_ben$rotation[,2]),decreasing=TRUE),2][1:25]
+
+#Hierarchical Clustering
+dist_mat = dist(pca_ben$x)
+tree_ben = hclust(dist_mat)
+plot(tree_ben) # closer together in the dendrogram = more similar 
+#Cut the tree to form 5 clusters
+clust5 = cutree(tree_ben, k=5)
+
+#two specific documents (5&19) in Cluster 3
+which(clust5 == 3)
+
+content(ben[[5]])
+content(ben[[19]])
+```
+
+**Results**: Through PCA, text data dimensionality was effectively reduced, retaining thematic information. According to the explained variance plot, the first few components capture the majority of the variance in the data. Furthermore, the top loadings showed that the text has the themes of political activism, opposition to governemt, and issues related to governance. Through clustering, documents were grouped based on their similiarities. Specifically, in cluster 3, text was mainly about Chinese political issues.
+
+**Conclusion**: The analysis of Benjamin Kang Lim's identified thematic clusters within the author's texts. PCA was effective in reducing the dimensionality of text data while retaining significant information. The first two principal components showed the themes of political activism. Hierarchical clustering grouped text files based of similar themes. This not only highlights the diversity in author's themes but also suggests certain topics are recurrent and can be categorized. Overall, the analysis demonstrated patterns of Benjamin Kang Lim's textual data, enabling a deeper understanding of author's focus and writing style.
+
+## Association rule mining
+
+```{r}
+library(tidyverse)
+library(igraph)
+library(arules)  
+library(arulesViz)
+
+#support=proportion of transactions in the dataset that contain a particular itemset(Higher support indicates more frequent occurrence.)
+#confidence=Confidence is the proportion of transactions containing item A that also contain item B.(Higher confidence indicates stronger association.)
+#lift=ratio of the observed support to that expected if A and B were independent.
+
+grocery=read.transactions("/Users/sarahlee/Downloads/groceries.txt", format="basket", sep=",")
+summary(grocery)
+grocery_rules <- apriori(grocery, parameter = list(support = 0.01, confidence = 0.4, maxlen = 4))
+
+#A low support parameter threshold of 0.001 to capture various discoveries of combinations 
+#I chose the confidence of 0.4 so that it captures a wider range of rules while filtering out weaker associations and not being overly restrictive 
+
+summary(grocery_rules)
+class(grocery_rules)
+
+inspect(grocery_rules[1:10])
+
+## top 10 baskets sorted by lift.
+inspect(sort(grocery_rules, by = "lift")[1:10])
+
+#the highest lift value is at 21.49, meaning bottled beer,liquor strongly associates with 'red/blush wine'. This makes sense as it is more likely for one to buy red/blush wine when he or she buys bottled beer and liquor. 
+
+
+plot(grocery_rules, measure = c("support", "lift"), shading = "confidence",jitter = 0)
+#Rules with higher lift values tend to be associated with lower support. The plot shows that there are several rules with very high lift (above 2.5) and moderate to high confidence (around 0.45 to 0.55), which suggests that these item combinations are strong and reliable, even if they don’t occur very frequently
+
+plot(grocery_rules, method='two-key plot',jitter = 0)
+#Higher-order rules (order 3, in blue) tend to have slightly higher confidence than the lower-order rules (order 2, in red). Higher support generally corresponds to lower confidence, which is typical because rules that apply to a large portion of the data (high support) are often less specific.
+
+
+```
+
+## Image classification with neural networks
+
+in jupyter notebook
